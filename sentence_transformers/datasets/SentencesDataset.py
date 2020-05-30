@@ -41,8 +41,10 @@ class SentencesDataset(Dataset):
         num_texts = len(examples[0].texts)
         inputs = [[] for _ in range(num_texts)]
         labels = []
+        multiplier = []
         too_long = [0] * num_texts
         label_type = None
+        multiply_type = torch.float
         iterator = examples
         max_seq_length = model.get_max_seq_length()
 
@@ -62,10 +64,13 @@ class SentencesDataset(Dataset):
                     too_long[i] += 1
 
             labels.append(example.label)
+            multiplier.append(example.multiplier)
+
             for i in range(num_texts):
                 inputs[i].append(tokenized_texts[i])
 
         tensor_labels = torch.tensor(labels, dtype=label_type)
+        tensor_multiply = torch.tensor(multiplier, dtype=multiply_type)
 
         logging.info("Num sentences: %d" % (len(examples)))
         for i in range(num_texts):
@@ -73,9 +78,10 @@ class SentencesDataset(Dataset):
 
         self.tokens = inputs
         self.labels = tensor_labels
+        self.multiply = tensor_multiply
 
     def __getitem__(self, item):
-        return [self.tokens[i][item] for i in range(len(self.tokens))], self.labels[item]
+            return [self.tokens[i][item] for i in range(len(self.tokens))], self.labels[item], self.multiply[item]
 
     def __len__(self):
         return len(self.tokens[0])

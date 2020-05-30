@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional  as F
 from torch import nn, Tensor
 from typing import Union, Tuple, List, Iterable, Dict
 from ..SentenceTransformer import SentenceTransformer
@@ -51,6 +52,73 @@ class SoftmaxLoss(nn.Module):
 
         if labels is not None:
             loss = loss_fct(output, labels.view(-1))
+            return loss
+        else:
+            return reps, output
+
+
+class SoftmaxMSEAlignLoss(nn.Module):
+    def __init__(self,
+                 model: SentenceTransformer,
+                 sentence_embedding_dimension: int,
+                 num_labels: int,
+                 concatenation_sent_rep: bool = True,
+                 concatenation_sent_difference: bool = True,
+                 concatenation_sent_multiplication: bool = False):
+        super(SoftmaxMSEAlignLoss, self).__init__()
+        self.model = model
+
+        # Additional layers.
+        self._MAX_MARGIN = -0.5
+        self._h_size = 768
+        self._ph1 = nn.Linear(self._h_size, 1024)
+        self._pr = nn.Linear(1024, self._h_size)
+        self._margin = torch.FloatTensor([self._MAX_MARGIN])
+        self._margin = self._margin.to("cuda")
+
+        self.num_labels = num_labels
+        self.concatenation_sent_rep = concatenation_sent_rep
+        self.concatenation_sent_difference = concatenation_sent_difference
+        self.concatenation_sent_multiplication = concatenation_sent_multiplication
+
+        num_vectors_concatenated = 0
+        if concatenation_sent_rep:
+            num_vectors_concatenated += 2
+        if concatenation_sent_difference:
+            num_vectors_concatenated += 1
+        if concatenation_sent_multiplication:
+            num_vectors_concatenated += 1
+        logging.info("Softmax loss: #Vectors concatenated: {}".format(num_vectors_concatenated))
+        self.classifier = nn.Linear(num_vectors_concatenated * sentence_embedding_dimension, num_labels)
+
+    def forward(self, sentence_features: Iterable[Dict[str, Tensor]], labels: Tensor, scale: Tensor):
+        reps = [self.model(sentence_feature)['sentence_embedding'] for sentence_feature in sentence_features]
+        rep_a, rep_b = reps
+
+        ph_a = F.leaky_relu(self._ph1(rep_a))
+        rep_a = self._pr(ph_a) # Get the projection of a->b.
+
+        vectors_concat = []
+        if self.concatenation_sent_rep:
+            vectors_concat.append(rep_a)
+            vectors_concat.append(rep_b)
+
+        if self.concatenation_sent_difference:
+            vectors_concat.append(torch.abs(rep_a - rep_b))
+
+        if self.concatenation_sent_multiplication:
+            vectors_concat.append(rep_a * rep_b)
+
+        features = torch.cat(vectors_concat, 1)
+
+        output = self.classifier(features)
+        loss_fct = nn.CrossEntropyLoss()
+
+        if labels is not None:
+            # Contrastive loss.
+            distance = torch.norm(rep_a - rep_b, dim=1)
+            c_loss = torch.mean(torch.max(scale * distance, self._margin.expand_as(distance)))
+            loss = loss_fct(output, labels.view(-1)) + c_loss
             return loss
         else:
             return reps, output

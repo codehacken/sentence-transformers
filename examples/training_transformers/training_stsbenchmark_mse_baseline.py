@@ -10,9 +10,9 @@ python training_nli.py pretrained_transformer_model_name
 """
 from torch.utils.data import DataLoader
 import math
-from sentence_transformers import SentenceTransformer,  SentencesDataset, LoggingHandler, losses, models
-from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
-from sentence_transformers.readers import STSBenchmarkDataReader
+from lib.sentence_transformers import SentenceTransformer,  SentencesDataset, LoggingHandler, losses, models
+from lib.sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
+from lib.sentence_transformers.readers import STSBenchmarkDataReader
 import logging
 from datetime import datetime
 import sys
@@ -31,7 +31,7 @@ model_name = sys.argv[2] if len(sys.argv) > 2 else 'bert-base-uncased'
 
 # Read the dataset
 train_batch_size = 16
-num_epochs = 4
+num_epochs = 6
 model_save_path = 'output/training_stsbenchmark_'+model_name.replace("/", "-")+'-'+datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 sts_reader = STSBenchmarkDataReader('../datasets/stsbenchmark', normalize_scores=True)
 
@@ -49,14 +49,13 @@ model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
 # Convert the dataset to a DataLoader ready for training
 logging.info("Read STSbenchmark train dataset")
 if size == "ALL":
-    train_data = SentencesDataset(sts_reader.get_examples('sts-train.csv'), model)
+    train_data = SentencesDataset(sts_reader.get_examples('sts-train.csv', multiply=True), model)
 else:
-    train_data = SentencesDataset(sts_reader.get_examples('sts-train.csv', max_examples=int(size)), model)
+    train_data = SentencesDataset(sts_reader.get_examples('sts-train.csv', multiply=True, max_examples=int(size)), model)
 
 train_dataloader = DataLoader(train_data, shuffle=True, batch_size=train_batch_size)
-# train_loss = losses.CosineSimilarityLoss(model=model)
-train_loss = losses.MSEPairLoss(model=model)
-# train_loss = losses.MSEAlignSTSLoss(model=model)
+# train_loss = losses.MSESTSLoss(model=model)
+train_loss = losses.MSEAlignSTSLoss(model=model)
 
 
 logging.info("Read STSbenchmark dev dataset")
@@ -76,7 +75,8 @@ model.fit(train_objectives=[(train_dataloader, train_loss)],
           epochs=num_epochs,
           evaluation_steps=1000,
           warmup_steps=warmup_steps,
-          output_path=model_save_path)
+          output_path=model_save_path,
+          multiply=True)
 
 
 ##############################################################################

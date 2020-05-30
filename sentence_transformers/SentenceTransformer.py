@@ -224,10 +224,12 @@ class SentenceTransformer(nn.Sequential):
         num_texts = len(batch[0][0])
 
         labels = []
+        scale_values = []
         paired_texts = [[] for _ in range(num_texts)]
         max_seq_len = [0] * num_texts
-        for tokens, label in batch:
+        for tokens, label, scale in batch:
             labels.append(label)
+            scale_values.append(scale)
             for i in range(num_texts):
                 paired_texts[i].append(tokens[i])
                 max_seq_len[i] = max(max_seq_len[i], len(tokens[i]))
@@ -253,8 +255,7 @@ class SentenceTransformer(nn.Sequential):
 
             features.append(feature_lists)
 
-        return {'features': features, 'labels': torch.stack(labels)}
-
+        return {'features': features, 'labels': torch.stack(labels), 'scale': torch.stack(scale_values)}
 
 
     def fit(self,
@@ -273,7 +274,8 @@ class SentenceTransformer(nn.Sequential):
             max_grad_norm: float = 1,
             fp16: bool = False,
             fp16_opt_level: str = 'O1',
-            local_rank: int = -1
+            local_rank: int = -1,
+            multiply: bool = False
             ):
         """
         Train the model with the given training objective
@@ -383,8 +385,11 @@ class SentenceTransformer(nn.Sequential):
                         data_iterators[train_idx] = data_iterator
                         data = next(data_iterator)
 
-                    features, labels = batch_to_device(data, self.device)
-                    loss_value = loss_model(features, labels)
+                    features, labels, scale = batch_to_device(data, self.device)
+                    if multiply is False:
+                        loss_value = loss_model(features, labels)
+                    else:
+                        loss_value = loss_model(features, labels, scale)
 
                     if fp16:
                         with amp.scale_loss(loss_value, optimizer) as scaled_loss:

@@ -11,7 +11,7 @@ class NLIDataReader(object):
     def __init__(self, dataset_folder):
         self.dataset_folder = dataset_folder
 
-    def get_examples(self, filename, max_examples=0):
+    def get_examples(self, filename, max_examples=0, multiplier=False):
         """
         data_splits specified which data split to use (train, dev, test).
         Expects that self.dataset_folder contains the files s1.$data_split.gz,  s2.$data_split.gz,
@@ -29,7 +29,13 @@ class NLIDataReader(object):
         for sentence_a, sentence_b, label in zip(s1, s2, labels):
             guid = "%s-%d" % (filename, id)
             id += 1
-            examples.append(InputExample(guid=guid, texts=[sentence_a, sentence_b], label=self.map_label(label)))
+            if multiplier is True:
+                examples.append(InputExample(guid=guid, texts=[sentence_a, sentence_b],
+                                             label=self.map_label(label),
+                                             multiplier=self.map_multipliers(label)))
+            else:
+                examples.append(InputExample(guid=guid, texts=[sentence_a, sentence_b],
+                                             label=self.map_label(label)))
 
             if 0 < max_examples <= len(examples):
                 break
@@ -40,8 +46,15 @@ class NLIDataReader(object):
     def get_labels():
         return {"contradiction": 0, "entailment": 1, "neutral": 2}
 
+    @staticmethod
+    def get_multiplier():
+        return {"entailment": 1.0, "contradiction": 0.0, "neutral": -1.0}
+
     def get_num_labels(self):
         return len(self.get_labels())
+
+    def map_multipliers(self, label):
+        return self.get_multiplier()[label.strip().lower()]
 
     def map_label(self, label):
         return self.get_labels()[label.strip().lower()]

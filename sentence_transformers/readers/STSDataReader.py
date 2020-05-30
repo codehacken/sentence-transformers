@@ -21,7 +21,7 @@ class STSDataReader:
         self.min_score = min_score
         self.max_score = max_score
 
-    def get_examples(self, filename, max_examples=0):
+    def get_examples(self, filename, max_examples=0, multiply=False):
         """
         filename specified which data split to use (train.csv, dev.csv, test.csv).
         """
@@ -36,12 +36,26 @@ class STSDataReader:
 
                 s1 = row[self.s1_col_idx]
                 s2 = row[self.s2_col_idx]
-                examples.append(InputExample(guid=filename+str(id), texts=[s1, s2], label=score))
+
+                if multiply is True:
+                    examples.append(InputExample(guid=filename+str(id), texts=[s1, s2], label=score,
+                                                 multiplier=self.map_multipliers(score)))
+                else:
+                    examples.append(InputExample(guid=filename+str(id), texts=[s1, s2], label=score))
 
                 if max_examples > 0 and len(examples) >= max_examples:
                     break
 
         return examples
+
+    # Assume the values are normalized.
+    def map_multipliers(self, score):
+        if self.normalize_scores:
+            # return score - 0.5
+            return score
+        else:
+            return (score / 5.0) - 2.5
+
 
 class STSBenchmarkDataReader(STSDataReader):
     """

@@ -48,6 +48,9 @@ class EmbeddingSimilarityEvaluator(SentenceEvaluator):
         self.csv_headers = ["epoch", "steps", "cosine_pearson", "cosine_spearman", "euclidean_pearson", "euclidean_spearman", "manhattan_pearson", "manhattan_spearman", "dot_pearson", "dot_spearman"]
 
     def __call__(self, model: 'SequentialSentenceEmbedder', output_path: str = None, epoch: int = -1, steps: int = -1) -> float:
+        # type(model)
+        # exit(0)
+        #
         model.eval()
         embeddings1 = []
         embeddings2 = []
@@ -70,7 +73,7 @@ class EmbeddingSimilarityEvaluator(SentenceEvaluator):
             iterator = tqdm(iterator, desc="Convert Evaluating")
 
         for step, batch in enumerate(iterator):
-            features, label_ids = batch_to_device(batch, self.device)
+            features, label_ids, _ = batch_to_device(batch, self.device)
             with torch.no_grad():
                 emb1, emb2 = [model(sent_features)['sentence_embedding'].to("cpu").numpy() for sent_features in features]
 

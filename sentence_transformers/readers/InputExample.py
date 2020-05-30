@@ -5,7 +5,8 @@ class InputExample:
     """
     Structure for one input example with texts, the label and a unique id
     """
-    def __init__(self, guid: str, texts: List[str], label: Union[int, float]):
+    def __init__(self, guid: str, texts: List[str], label: Union[int, float],
+                 multiplier: Union[int, float] = None):
         """
         Creates one InputExample with the given texts, guid and label
 
@@ -21,3 +22,7 @@ class InputExample:
         self.guid = guid
         self.texts = [text.strip() for text in texts]
         self.label = label
+        if multiplier is not None:
+            self.multiplier = multiplier
+        else:
+            self.multiplier = 1.0
